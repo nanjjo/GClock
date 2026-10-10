@@ -1,0 +1,29 @@
+"""Application-owned Korean and English UI strings."""
+TEXT = {
+    'ko': {
+        'title': '시각 타이머', 'topmost': '항상 위', 'intro': '당신의 시간을 가볍게',
+        'guide': '다이얼 클릭 후 휠 ↑↓: 1분 조절 · 드래그도 가능',
+        'reset': '초기화', 'start': '시작', 'pause': '일시정지',
+        'audio_title': '종료 시 재생할 MP3', 'mute': '무음', 'browse': '찾기',
+        'preview': '미리 듣기', 'stop_audio': '재생 중지', 'preset': '{minutes}분',
+        'choose_mp3': '종료 알림 MP3 선택', 'mp3_files': 'MP3 음악',
+        'ready': '준비됐어요. 시작을 눌러주세요.', 'running': '지금, 하나에 집중하세요',
+        'reset_ready': '다시 시작할 준비가 됐어요', 'completed': '집중 시간 완료! 잠시 쉬어 가세요.',
+        'save_error': '설정을 저장하지 못했습니다. 저장 폴더 권한을 확인하세요.',
+        'play_error': 'MP3 재생 실패', 'stop_error': '재생 중지 실패',
+        'invalid_mp3': '존재하는 MP3 파일의 경로를 입력하세요.', 'decode_error': 'MP3 재생 오류',
+    },
+    'en': {
+        'title': 'Visual Timer', 'topmost': 'Always on top', 'intro': 'Make time for what matters',
+        'guide': 'Click / drag dial · Wheel ↑↓: 1 min',
+        'reset': 'Reset', 'start': 'Start', 'pause': 'Pause',
+        'audio_title': 'MP3 at end', 'mute': 'Mute', 'browse': 'Browse',
+        'preview': 'Preview', 'stop_audio': 'Stop audio', 'preset': '{minutes} min',
+        'choose_mp3': 'Choose MP3 alarm', 'mp3_files': 'MP3 audio',
+        'ready': 'Ready. Press Start.', 'running': 'Focus on one thing',
+        'reset_ready': 'Ready to start again', 'completed': 'Time is up! Take a short break.',
+        'save_error': 'Could not save settings. Check folder permissions.',
+        'play_error': 'MP3 playback failed', 'stop_error': 'Could not stop audio',
+        'invalid_mp3': 'Enter the path to an existing MP3 file.', 'decode_error': 'MP3 playback error',
+    },
+}

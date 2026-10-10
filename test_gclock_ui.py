@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from gclock import GClock
 from pathlib import Path
+from tkinter import font as tkfont
 
 
 class InteractionTests(unittest.TestCase):
@@ -17,6 +18,52 @@ class InteractionTests(unittest.TestCase):
     def tearDown(self):
         self.app.close()
         self.assertEqual(self.callback_errors, [])
+
+    def test_language_switch_preserves_running_timer_and_audio(self):
+        self.assertEqual(self.app.language, 'ko')
+        self.app.select(30)
+        self.app.toggle()
+        deadline = self.app.state.deadline
+        self.app.audio = Mock()
+        self.app.language_choice.set('English')
+        self.app.language_combo.event_generate('<<ComboboxSelected>>')
+        self.root.update()
+        self.assertEqual(self.app.language, 'en')
+        self.assertEqual(self.app.play.cget('text'), 'Pause')
+        self.assertEqual(self.app.browse_button.cget('text'), 'Browse')
+        self.assertEqual(self.app.mute_button.cget('text'), 'Mute')
+        self.assertIn('Visual Timer', self.root.title())
+        self.assertEqual(self.app.state.selected, 1800)
+        self.assertEqual(self.app.state.deadline, deadline)
+        self.app.audio.play.assert_not_called()
+        self.app.audio.stop.assert_not_called()
+        self.assertLess(self.app.language_combo.winfo_rootx(), self.app.topmost_button.winfo_rootx())
+        self.assertEqual(self.app.path_entry.winfo_height(), self.app.browse_button.winfo_height())
+        font = tkfont.Font(root=self.root, font=self.app.path_entry.cget('font'))
+        original = tkfont.nametofont('TkTextFont', root=self.root)
+        self.assertEqual(font.actual('size'), original.actual('size')*2)
+        self.app.language_choice.set('한국어')
+        self.app.change_language()
+        self.root.update()
+        self.assertEqual(self.app.play.cget('text'), '일시정지')
+        self.assertEqual(self.app.state.deadline, deadline)
+
+    def test_english_dialog_and_completion_strings(self):
+        self.app.language_choice.set('English')
+        self.app.change_language()
+        self.root.update()
+        with patch('gclock.filedialog.askopenfilename', return_value='') as dialog:
+            self.app.browse_mp3()
+        self.assertEqual(dialog.call_args.kwargs['title'], 'Choose MP3 alarm')
+        self.app.audio = Mock()
+        self.app.audio.play.side_effect = ValueError('존재하는 MP3 파일의 경로를 입력하세요.')
+        with patch('gclock.messagebox.showerror') as error:
+            self.app.preview_audio()
+        self.assertEqual(error.call_args.args, ('MP3 playback failed', 'Enter the path to an existing MP3 file.'))
+        self.app.muted.set(True)
+        self.app.state.deadline = self.app.state.clock()-1
+        self.app.tick()
+        self.assertEqual(self.app.status.cget('text'), 'Time is up! Take a short break.')
 
     def test_compact_body_and_volume_fill(self):
         bottom = self.app.time_label.winfo_y()+self.app.time_label.winfo_height()

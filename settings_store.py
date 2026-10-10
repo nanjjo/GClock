@@ -12,6 +12,8 @@ def validate(data):
     result = {}
     if not isinstance(data, dict):
         return result
+    if data.get('language') in ('ko', 'en'):
+        result['language'] = data['language']
     if type(data.get('layout_version')) is int and data['layout_version'] in (1, 2, 3, 4):
         result['layout_version'] = data['layout_version']
     seconds = data.get('selected_seconds')

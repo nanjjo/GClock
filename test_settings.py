@@ -40,6 +40,7 @@ class SettingsTests(unittest.TestCase):
         self.path.write_text('{broken', encoding='utf-8')
         self.assertEqual(SettingsStore(self.path).load(), {})
         self.assertEqual(validate(dict(selected_seconds=99999, muted='true', color='invalid', window=[])), {})
+        self.assertEqual(validate({'language': 'unsupported'}), {})
 
     def test_restart_restores_preferences_without_starting_timer(self):
         root = tk.Tk()
@@ -51,6 +52,8 @@ class SettingsTests(unittest.TestCase):
         app.muted.set(True)
         app.topmost.set(True)
         app.volume.set(37)
+        app.language_choice.set('English')
+        app.change_language()
         app.state.start()
         app.close()
         root = tk.Tk()
@@ -66,6 +69,9 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(app.volume.get(), 37)
             self.assertAlmostEqual(app.audio.volume, .37)
             self.assertEqual(app.mp3_path.get(), 'C:/음악/노래.mp3')
+            self.assertEqual(app.language, 'en')
+            self.assertEqual(app.language_choice.get(), 'English')
+            self.assertEqual(app.play.cget('text'), 'Start')
         finally:
             app.close()
 

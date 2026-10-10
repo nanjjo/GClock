@@ -28,6 +28,13 @@ class DisplayTests(unittest.TestCase):
                     self.assertGreater(app.dial_image.width(), 100)
                     self.assertAlmostEqual(float(root.tk.call('tk', 'scaling')), dpi/72, delta=.02)
                     self.assertTrue(app.play.winfo_ismapped())
+                    app.language_choice.set('English')
+                    app.change_language()
+                    root.update()
+                    self.assertEqual(app.heading.winfo_width(), app.heading.winfo_reqwidth())
+                    self.assertLessEqual(app.heading.winfo_rootx()+app.heading.winfo_width(),
+                                         app.language_combo.winfo_rootx())
+                    self.assertEqual(app.path_entry.winfo_height(), app.browse_button.winfo_height())
                 finally:
                     app.close()
 

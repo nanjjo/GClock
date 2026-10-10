@@ -1,4 +1,4 @@
-# GClock v2.0 제작 및 배포 안내
+# GClock v2.1 제작 및 배포 안내
 
 GPT-6.1 Sol을 활용해 제작한 Windows x64 시각 타이머입니다.
 

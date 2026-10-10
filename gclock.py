@@ -15,6 +15,9 @@ import ctypes
 from tkinter import font as tkfont
 from pathlib import Path
 from volume_control import VolumeBar
+from translations import TEXT
+
+VERSION = '2.1'
 
 
 class TimerState:
@@ -57,7 +60,11 @@ class GClock:
         self.root = root
         self.settings = SettingsStore(settings_path)
         saved = self.settings.load()
+        self.language = saved.get('language', 'ko')
+        self.status_key = 'intro'
+        self.status_detail = ''
         self.save_id = None
+        self.layout_id = None
         self.normal_window = saved.get('window')
         dpi = system_dpi()
         self.display_scale = dpi / 96
@@ -77,7 +84,7 @@ class GClock:
         self.mp3_path = tk.StringVar(value=saved.get('mp3_path', ''))
         self.last_drawing = None
         self.last_layout = None
-        root.title('GClock · 시각 타이머 · v2.0')
+        root.title(f'GClock · 시각 타이머 · v{VERSION}')
         root.geometry(f'{round(512*self.display_scale)}x{round(704*self.display_scale)}')
         root.minsize(round(440*self.display_scale), round(650*self.display_scale))
         if self.normal_window:
@@ -119,8 +126,15 @@ class GClock:
         self.heading.pack(side='left')
         options = ttk.Frame(header)
         options.pack(side='right')
-        ttk.Checkbutton(options, text='항상 위', variable=self.topmost,
-                        command=lambda: root.attributes('-topmost', self.topmost.get())).pack(side='left', padx=6)
+        self.language_choice = tk.StringVar(value='한국어' if self.language == 'ko' else 'English')
+        self.language_combo = ttk.Combobox(options, state='readonly', width=7,
+                                          textvariable=self.language_choice, values=('한국어', 'English'),
+                                          font=('맑은 고딕', 11))
+        self.language_combo.pack(side='left', padx=(0, 4))
+        self.language_combo.bind('<<ComboboxSelected>>', self.change_language)
+        self.topmost_button = ttk.Checkbutton(options, variable=self.topmost,
+                        command=lambda: root.attributes('-topmost', self.topmost.get()))
+        self.topmost_button.pack(side='left', padx=6)
         for index, color in enumerate(self.COLORS):
             tk.Button(options, bg=color, activebackground=color, width=2,
                       relief='flat', command=lambda c=color: self.change_color(c)).pack(
@@ -138,19 +152,23 @@ class GClock:
         self.canvas.bind('<B1-Motion>', self.pointer)
         root.bind('<MouseWheel>', self.wheel)
         self.time_label = ttk.Label(dial_row, font=('Consolas', 36))
-        ttk.Label(main, text='다이얼 클릭 후 휠 ↑↓: 1분 조절 · 드래그도 가능').pack()
+        self.guide = ttk.Label(main)
+        self.guide.pack()
         self.slider = tk.Scale(dial_row, from_=60, to=0, orient='vertical',
                                resolution=1, bg='#f5f3ed', highlightthickness=0,
                                width=round(30*self.display_scale), font=('맑은 고딕', 14),
                                command=self.from_slider)
         self.slider.set(self.state.selected/60)
         self.presets = ttk.Frame(dial_row)
+        self.preset_buttons = []
         for minutes in [10, 30, 50]:
-            ttk.Button(self.presets, text=f'{minutes}분', width=4,
-                       command=lambda m=minutes: self.select(m)).pack(pady=6)
+            button = ttk.Button(self.presets, width=4, command=lambda m=minutes: self.select(m))
+            button.pack(pady=6)
+            self.preset_buttons.append((minutes, button))
         controls = ttk.Frame(main)
         controls.pack(pady=12)
-        ttk.Button(controls, text='초기화', command=self.reset).pack(side='left', padx=6)
+        self.reset_button = ttk.Button(controls, command=self.reset)
+        self.reset_button.pack(side='left', padx=6)
         self.play = ttk.Button(controls, text='시작', command=self.toggle)
         self.play.pack(side='left', padx=6)
         audio_heading = ttk.Frame(main)
@@ -166,22 +184,67 @@ class GClock:
         audio_row = ttk.Frame(main)
         audio_row.pack(fill='x')
         self.path_entry = ttk.Entry(audio_row, textvariable=self.mp3_path)
+        original_font = tkfont.Font(root=root, font=self.path_entry.cget('font'))
+        self.path_entry.configure(font=('맑은 고딕', abs(original_font.actual('size'))*2))
         self.path_entry.pack(side='left', fill='both', expand=True)
         self.browse_button = ttk.Button(audio_row, text='찾기', width=4, command=self.browse_mp3)
         self.browse_button.pack(side='left', padx=(6, 0))
         audio_controls = ttk.Frame(main)
         audio_controls.pack(pady=(6, 0))
-        ttk.Button(audio_controls, text='미리 듣기', command=self.preview_audio).pack(side='left', padx=4)
-        ttk.Button(audio_controls, text='재생 중지', command=self.stop_audio).pack(side='left', padx=4)
+        self.preview_button = ttk.Button(audio_controls, command=self.preview_audio)
+        self.preview_button.pack(side='left', padx=4)
+        self.stop_button = ttk.Button(audio_controls, command=self.stop_audio)
+        self.stop_button.pack(side='left', padx=4)
         root.bind('<space>', lambda e: self.shortcut(e, self.toggle))
         root.bind('<Escape>', lambda e: self.shortcut(e, self.reset))
-        self.refresh()
+        self.apply_language()
         self.tick_id = root.after(100, self.tick)
         for variable in (self.muted, self.topmost, self.mp3_path):
             variable.trace_add('write', lambda *_: self.queue_save())
         root.bind('<Configure>', self.window_changed, add='+')
         if saved.get('maximized'):
             root.state('zoomed')
+
+    def tr(self, key, **values):
+        return TEXT[self.language][key].format(**values)
+
+    def set_status(self, key, detail=''):
+        self.status_key, self.status_detail = key, detail
+        text = self.tr(key)
+        if detail:
+            text += ': ' + self.error_text(detail)
+        self.status.config(text=text)
+
+    def error_text(self, error):
+        text = str(error)
+        for key in ('invalid_mp3', 'decode_error'):
+            text = text.replace(TEXT['ko'][key], self.tr(key))
+        return text
+
+    def apply_language(self):
+        self.root.title(f'GClock · {self.tr("title")} · v{VERSION}')
+        for widget, key in ((self.topmost_button, 'topmost'), (self.guide, 'guide'),
+                            (self.reset_button, 'reset'), (self.audio_title, 'audio_title'),
+                            (self.mute_button, 'mute'), (self.browse_button, 'browse'),
+                            (self.preview_button, 'preview'), (self.stop_button, 'stop_audio')):
+            widget.config(text=self.tr(key))
+        self.browse_button.config(width=6 if self.language == 'en' else 4)
+        for minutes, button in self.preset_buttons:
+            button.config(text=self.tr('preset', minutes=minutes), width=6 if self.language == 'en' else 4)
+        self.set_status(self.status_key, self.status_detail)
+        self.refresh()
+        if self.layout_id is not None:
+            self.root.after_cancel(self.layout_id)
+        self.layout_id = self.root.after_idle(self.language_layout)
+
+    def language_layout(self):
+        self.layout_id = None
+        self.resize_dial()
+
+    def change_language(self, _event=None):
+        self.language = 'en' if self.language_choice.get() == 'English' else 'ko'
+        self.apply_language()
+        self.queue_save()
 
     def window_changed(self, event):
         if event.widget == self.root:
@@ -232,11 +295,12 @@ class GClock:
                     mp3_path=self.mp3_path.get(), window=self.normal_window,
                     volume_percent=self.volume.get(),
                     layout_version=4,
+                    language=self.language,
                     maximized=self.root.state() == 'zoomed')
         try:
             self.settings.save(data)
         except OSError:
-            self.status.config(text='설정을 저장하지 못했습니다. 저장 폴더 권한을 확인하세요.')
+            self.set_status('save_error')
 
     def change_color(self, color):
         self.color = color
@@ -246,8 +310,8 @@ class GClock:
     def browse_mp3(self):
         self.path_entry.focus_set()
         self.wheel_remainder = 0
-        path = filedialog.askopenfilename(parent=self.root, title='종료 알림 MP3 선택',
-                                         filetypes=[('MP3 음악', '*.mp3')])
+        path = filedialog.askopenfilename(parent=self.root, title=self.tr('choose_mp3'),
+                                         filetypes=[(self.tr('mp3_files'), '*.mp3')])
         if path:
             self.mp3_path.set(path)
 
@@ -261,13 +325,13 @@ class GClock:
         try:
             self.audio.play(self.audio_path())
         except (ValueError, RuntimeError, OSError) as error:
-            messagebox.showerror('MP3 재생 실패', str(error), parent=self.root)
+            messagebox.showerror(self.tr('play_error'), self.error_text(error), parent=self.root)
 
     def stop_audio(self):
         try:
             self.audio.stop()
         except RuntimeError as error:
-            messagebox.showerror('재생 중지 실패', str(error), parent=self.root)
+            messagebox.showerror(self.tr('stop_error'), self.error_text(error), parent=self.root)
 
     def mute_changed(self):
         if self.muted.get():
@@ -275,6 +339,8 @@ class GClock:
 
     def close(self):
         self.root.after_cancel(self.tick_id)
+        if self.layout_id is not None:
+            self.root.after_cancel(self.layout_id)
         if self.save_id is not None:
             self.root.after_cancel(self.save_id)
         self.save_settings()
@@ -292,7 +358,7 @@ class GClock:
         self.state.set_minutes(minutes)
         if sync:
             self.slider.set(round(minutes))
-        self.status.config(text='준비됐어요. 시작을 눌러주세요.')
+        self.set_status('ready')
         self.refresh()
 
         self.queue_save()
@@ -324,25 +390,25 @@ class GClock:
             self.state.start()
         else:
             self.state.pause()
-        self.status.config(text='지금, 하나에 집중하세요' if self.state.deadline else '일시정지')
+        self.set_status('running' if self.state.deadline else 'pause')
         self.refresh()
 
     def reset(self):
         self.stop_audio()
         self.state.reset()
-        self.status.config(text='다시 시작할 준비가 됐어요')
+        self.set_status('reset_ready')
         self.refresh()
 
     def tick(self):
         self.root.after_cancel(self.tick_id)
         if self.state.tick():
-            self.status.config(text='집중 시간 완료! 잠시 쉬어 가세요.')
+            self.set_status('completed')
             if not self.muted.get():
                 if self.mp3_path.get().strip():
                     try:
                         self.audio.play(self.audio_path())
                     except (ValueError, RuntimeError, OSError) as error:
-                        self.status.config(text=f'MP3 재생 실패: {error}')
+                        self.set_status('play_error', error)
                         winsound.PlaySound('SystemExclamation', winsound.SND_ALIAS | winsound.SND_ASYNC)
                 else:
                     winsound.PlaySound('SystemExclamation', winsound.SND_ALIAS | winsound.SND_ASYNC)
@@ -352,7 +418,7 @@ class GClock:
     def refresh(self):
         seconds = math.ceil(self.state.remaining)
         self.time_label.config(text=f'{seconds // 60:02}:{seconds % 60:02}')
-        self.play.config(text='일시정지' if self.state.deadline else '시작',
+        self.play.config(text=self.tr('pause' if self.state.deadline else 'start'),
                          state='normal' if seconds else 'disabled')
         self.draw()
 
@@ -401,6 +467,14 @@ if __name__ == '__main__':
         root.update()
         assert app.state.deadline is not None
         assert app.dial_image is not None and app.dial_image.width() > 0
+        deadline = app.state.deadline
+        app.language_choice.set('English')
+        app.change_language()
+        root.update()
+        assert app.play.cget('text') == 'Pause'
+        assert app.state.deadline == deadline
+        app.language_choice.set('한국어')
+        app.change_language()
         app.reset()
         assert app.state.remaining == 3600
         # Verify bundled native decoder and the 50 ms device request size.
