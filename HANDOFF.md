@@ -45,7 +45,7 @@
 
 게시 대상: https://github.com/nanjjo/GClock (공개, 사용자 승인).
 릴리스 대상: https://github.com/nanjjo/GClock/releases/tag/v2.1
-게시 상태: v2.1 업로드 확인 중.
+게시 상태: 2026-10-10(Asia/Seoul), 공개 main 소스 및 v2.1 정식 릴리스 게시 완료. EXE/ZIP/SHA256SUMS/ABOUT/의존성 라이선스 자산이 uploaded 상태이고, EXE와 ZIP의 서버 SHA256이 로컬 파일과 일치함을 확인했다.
 
 v2.0은 이전 게시본이다. 최종 언어 기능은v2.1에 제공한다. 릴리스 자산은 EXE, Windows x64 ZIP, SHA256SUMS, ABOUT, 의존성 라이선스다. ZIP에는 README/SPEC도 넣는다. 최신 게시 결과를 기록하는 HANDOFF는 저장소 루트에서 제공한다. GitHub CLI는 로컬 .tools/github-cli/runtime/bin/gh.exe, 설정은 GH_CONFIG_DIR=.tools/github-cli/config이다. 둘 다 Git에서 제외한다. 로그인은 사용자 계정nanjjo로 완료했으며 토큰은 Windows keyring을 이용한다. 후속 게시 전 인증 상태를 다시 확인한다.
 
@@ -70,3 +70,5 @@ GPT-6.1 Sol 활용 제작. pyminiaudio1.71 https://github.com/irmen/pyminiaudio 
 사용자 요청에 따라 개인 project-finish-docs 스킬에 GitHub 등록·업데이트·릴리스 게시를 포함했다. 설치 위치는사용자 ~/.codex/skills/project-finish-docs/SKILL.md다. 기존 원격/공개 여부를 재사용하고 미지정 공개 여부나 계정 인증만 필요한 경우 확인한다. 이 프로젝트의 공개 게시 승인을 다른 프로젝트의 공개 승인으로 확장하지 않는다.
 
 개인 마무리 스킬은 설치본 및 로컬 사본 모두 quick_validate에서 유효 판정을 받았다. 검증 도구의 PyYAML은 Git 제외 .tools/skill-validator에만 설치했다. 앱 실행 의존성에는 추가하지 않았다.
+
+이번 마무리 요청의 필수 작업은 완료했다. 개인 스킬 업데이트, 현재 사양/인수인계 정리, 최종20개 테스트 및 EXE 검증, 공개 GitHub 소스와 v2.1 배포 게시를 수행했다. 클린PC·혼합DPI·M4A 등 앞서 명시한 확장은 별도 요청 범위다.
