@@ -72,8 +72,22 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(app.language, 'en')
             self.assertEqual(app.language_choice.get(), 'English')
             self.assertEqual(app.play.cget('text'), 'Start')
+            self.assertEqual(app.audio_dialog.state(), 'withdrawn')
         finally:
             app.close()
+
+    def test_v4_window_migrates_once_to_compact_main_window(self):
+        SettingsStore(self.path).save(dict(layout_version=4,
+                                         window=dict(width=512, height=704, x=100, y=100)))
+        for _ in range(2):
+            root = tk.Tk()
+            app = GClock(root, settings_path=self.path)
+            try:
+                root.update()
+                self.assertAlmostEqual(root.winfo_height()/app.display_scale, 560, delta=1)
+            finally:
+                app.close()
+        self.assertEqual(SettingsStore(self.path).load()['layout_version'], 5)
 
 
 if __name__ == '__main__':

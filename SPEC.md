@@ -1,10 +1,10 @@
-# GClock v2.1 — 빈 프로젝트에서 만드는 독립 제작 사양
+# GClock v2.2 — 빈 프로젝트에서 만드는 독립 제작 사양
 
-작성일: 2026-10-10 (Asia/Seoul). 현재 소스와 대화 없이 이 문서로 동등한 Windows 시각 타이머를 만들 수 있어야 한다. 앱은 Python/Tkinter 데스크톱 프로그램이다. HTTP API·Android 앱을 대신 만들지 않는다. 제작 도구 표기는GPT-6.1 Sol이다.
+작성일: 2026-10-17 (Asia/Seoul). 현재 소스와 대화 없이 이 문서로 동등한 Windows 시각 타이머를 만들 수 있어야 한다. 앱은 Python/Tkinter 데스크톱 프로그램이다. HTTP API·Android 앱을 대신 만들지 않는다. 제작 도구 표기는GPT-6.1 Sol이다.
 
 ## 1. 환경과 파일
 
-빌드: Windows x64, Tkinter 포함Python3.12 x64. 실행: Windows x64, Python 설치 불필요. gclock.py를 진입점으로 하고 audio_player.py, volume_control.py, dial_renderer.py, display_support.py, settings_store.py, translations.py로 분리한다. 배치2개, Windows manifest, 테스트5개 모듈, 사용/인수인계/사양/릴리스/제작 안내와 의존성 라이선스 전문을 제공한다.
+빌드: Windows x64, Tkinter 포함Python3.12 x64. 실행: Windows x64, Python 설치 불필요. gclock.py를 진입점으로 하고 audio_player.py, volume_control.py, dial_renderer.py, display_support.py, settings_store.py, translations.py로 분리하고 빌드 검증기 verify_executable.py를 둔다. 배치2개, Windows manifest, 테스트5개 모듈, 사용/인수인계/사양/릴리스/제작 안내와 의존성 라이선스 전문을 제공한다.
 
 requirements.txt:
 
@@ -31,13 +31,13 @@ TimerState(clock=time.monotonic)를 만든다. selected=1500 정수초, remainin
 
 ## 3. DPI와 기본 화면
 
-Tk 생성 전에SetProcessDPIAware를 호출하고 지원되지 않으면 무시한다. EXE manifest는dpiAware=true, dpiAwareness=System, requestedExecutionLevel=asInvoker, assemblyIdentity.version=2.1.0.0으로 설정한다. GetDpiForSystem이 없으면96을 사용한다. s=dpi/96, Tk scaling=dpi/72. 글꼴은 point 단위로 지정하고 다시s를 곱하지 않는다.
+Tk 생성 전에SetProcessDPIAware를 호출하고 지원되지 않으면 무시한다. EXE manifest는dpiAware=true, dpiAwareness=System, requestedExecutionLevel=asInvoker, assemblyIdentity.version=2.2.0.0으로 설정한다. GetDpiForSystem이 없으면96을 사용한다. s=dpi/96, Tk scaling=dpi/72. 글꼴은 point 단위로 지정하고 다시s를 곱하지 않는다.
 
-VERSION='2.1'. 창 제목은 GClock · 시각 타이머 · v2.1 또는 영어 GClock · Visual Timer · v2.1이다. 기본512*s ×704*s, 최소440*s ×650*s. 배경#f5f3ed, ttk clam. 기본 맑은 고딕11pt, 버튼padding=round(8*s). main의패딩(left6*s,top0,right6*s,bottom4*s).
+VERSION='2.2'. 창 제목은 GClock · 시각 타이머 · v2.2 또는 영어 GClock · Visual Timer · v2.2이다. 기본512*s ×560*s, 최소440*s ×500*s. 배경#f5f3ed, ttk clam. 기본 맑은 고딕11pt, 버튼padding=round(8*s). main의패딩(left6*s,top0,right6*s,bottom4*s).
 
 상단 헤더 왼쪽GClock23pt bold. 오른쪽그룹은 한국어/English 읽기 전용콤보(width7,11pt), 항상 위 체크박스, 색상3개 순서다. 색상은#df4a42,#3d8769,#447db0. 마지막색상 버튼 오른쪽pack padx=0으로 끝선을 맞춘다. 항상 위는root.attributes('-topmost',bool).
 
-그 아래 상태 문구는윗간격8, 아래11pt 글꼴의linespace. 다음 다이얼영역, 남은 시간, 조작 안내, 초기화/시작, MP3 안내·무음·볼륨, 경로 입력/찾기, 미리 듣기/재생 중지 순서다. controls pady12, MP3 heading pady(12,4), 마지막controls pady(6,0). MP3 안내는왼쪽, 볼륨부터side=right로pack하고 무음을그 왼쪽에 둔다. 글꼴11pt와수직중앙을 맞춘다. Entry와찾기는같은부모, Entry fill=both/expand=True로높이를맞춘다. 기본Entry 폰트의actual(size)를읽고맑은고딕2배point로바꾼다.
+그 아래 상태 문구는윗간격8, 아래11pt 글꼴의linespace. 다음 다이얼영역, 남은 시간, 조작 안내, 초기화/시작/소리 설정 순서다. MP3 영역은 루트 대신 처음부터 withdraw한 Toplevel 하나 안에 생성한다. 소리 설정 버튼은 같은 창을 재사용하고 transient(root), 비모달(입력 grab 없음)로 보여 준다. 기본640*s×200*s, 최소540*s×200*s, padding12*s. 처음 열 때 부모 가운데에 배치하고 가상 화면 경계로 제한한다. MP3 안내·무음·볼륨, 경로 입력/찾기, 미리 듣기/재생 중지/닫기 순서다. 닫기/X/Escape는 음악 stop 및 withdraw, Canvas 포커스 복귀다. 설정 변수는 루트와 공유하고 즉시 자동 저장한다. 언어 전환은 창 제목과 모든 버튼에도 적용하며 항상 위 속성은 두 창에 적용한다. controls pady12, MP3 heading pady(12,4), 마지막controls pady(6,0). MP3 안내는왼쪽, 볼륨부터side=right로pack하고 무음을그 왼쪽에 둔다. 글꼴11pt와수직중앙을 맞춘다. Entry와찾기는같은부모, Entry fill=both/expand=True로높이를맞춘다. 기본Entry 폰트의actual(size)를읽고맑은고딕2배point로바꾼다.
 
 ## 4. 다이얼 및 주변 배치
 
@@ -85,6 +85,14 @@ device.start(stream)
 
 미리듣기는무음과무관한수동재생. 무음체크는현재재생stop 및자동알림억제. 타이머완료시MP3가설정되면재생,없거나재생실패시winsound SystemExclamation/SND_ALIAS|SND_ASYNC. 미리듣기오류는messagebox,자동재생오류는상태에표시한뒤기본음. 상대음악경로는JSON부모기준이며두경로모두공통audio_path를사용한다.
 
+## 6A. 지속되는 종료 파동
+
+TimerState.tick이 True일 때 소리와 독립적으로 completion_started=time.monotonic()을 설정한다. remaining은 계속 0, 시간 표시는00:00이다. 별도의 after(33) 루프에서 Canvas oval 3개만 갱신한다. 매 프레임 Pillow 다이얼을 재렌더링하지 않는다.
+
+각 i=0,1,2에 phase=((monotonic()-completion_started)/2.4+i/3)%1, 반경=r*(.12+.86*phase), alpha=.85*(1-phase)를 사용한다. 선택 색 RGB를 바탕 RGB(238,238,238)와 alpha로 섞고 outline으로 지정한다. 두께=max(2,round(r*.018)), 중심은 현재 geometry의 cx/cy다. 공통 태그 completion, 개별 wave0..2를 부여하고 기존 oval을 재사용한다. 끝에서 처음으로 순환하며 계속 퍼진다. Canvas 다이얼 전체가 다시 그려지면 파동을 재생성한다. 창 크기/색/언어 변경 중에도 종료 상태를 유지한다.
+
+종료 중 초기화 버튼은 확인/Dismiss, 시작 버튼은 다시 시작/Restart가 된다. 확인·다이얼 클릭·Escape는 음악 stop, animation after 취소, 태그 삭제, completion_started=None, TimerState.reset 후 준비 상태다. 다시 시작/Space는 같은 정리를 수행한 뒤 기존 selected로 reset/start한다. 새 시간/프리셋 선택도 파동과 알림을 정지한다. 소리 설정 창을 닫거나 음악 재생만 정지해도 시각 알림은 계속된다. 무음/MP3 오류에도 파동은 실행하며 루트 종료 시 animation ID를 반드시 취소한다. 종료 파동은 카운트다운을 새로 실행하거나 저장하지 않는다.
+
 ## 7. 언어와 설정
 
 translations.TEXT={'ko':{…},'en':{…}}에같은키를둔다. 기본ko,콤보표시는한국어/English. 제목·항상위·안내·프리셋·Reset/Start/Pause·MP3 at end/Mute/Browse/Preview/Stop audio·파일선택제목/유형·상태/오류를번역한다. 상태는status_key/detail로기억하고언어전환시현재언어로다시표시한다. 전환은텍스트·폭·상태·refresh/레이아웃만갱신하고selected/remaining/deadline/오디오를건드리지않는다. 앱이생성한오디오한국어예외문구도현재언어로바꾼다. 네이티브오류상세와OS파일대화상자버튼은OS언어를유지한다.
@@ -101,31 +109,33 @@ SettingsStore(path=None/False/지정경로). frozen은Path(sys.executable).resol
 | muted,topmost,maximized | 정확한bool /False |
 | color | 위3색화이트리스트 /빨강 |
 | mp3_path | 문자열길이<=32768 /빈문자열 |
-| layout_version | int1..4 /구형1 |
-| window | width440..8000,height650..8000,x/y 절댓값<=100000,모두int |
+| layout_version | int1..5 /구형1 |
+| window | width440..8000,height500..8000,x/y 절댓값<=100000,모두int |
 
 창크기는s로나눈논리값,좌표는물리값. 가상모니터GetSystemMetrics(76..79)와비교해접근가능한제목위치일때복원한다. 최대화는normal창크기를유지한채복원한다. JSON변경은500ms debounce와종료시저장. 진행중remaining/deadline/재생상태는저장하지않는다.
 
-구형window마이그레이션:layout<2는최소520×720,layout<3는폭+40(최대8000),layout<4는width=max(440,width-48),height=max(650,height-16). 순서대로적용하고다음저장에layout_version4. 제품버전2.1과분리한다. 종료는tick/save/layout after 취소→설정저장→오디오stop→root.destroy.
+구형window마이그레이션:layout<2는최소520×720,layout<3는폭+40(최대8000),layout<4는width=max(440,width-48),height=max(650,height-16). 이어서 layout<5는 height=max(500,height-144). 순서대로적용하고다음저장에layout_version5. 제품버전2.2와분리한다. 종료는파동 animation after 취소 및 Canvas 파동 삭제→tick/save/layout after 취소→설정저장→오디오stop→root.destroy.
 
 ## 8. 빌드와 배포
 
-build.bat는setlocal,cd /d "%~dp0",.build-temp 생성후TEMP/TMP/PYINSTALLER_CONFIG_DIR를프로젝트내부로설정한다. .venv가없으면py -3 또는python -m venv로만든다. ensurepip,고정requirements-build 설치,테스트20개실행,PyInstaller순서이며매단계errorlevel검사와실패exit /b1.
+build.bat는setlocal,cd /d "%~dp0",.build-temp 생성후TEMP/TMP/PYINSTALLER_CONFIG_DIR를프로젝트내부로설정한다. .venv가없으면py -3 또는python -m venv로만든다. ensurepip,고정requirements-build 설치,테스트25개실행,PyInstaller순서이며매단계errorlevel검사와실패exit /b1.
 
 ```bat
 ".venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --onefile --windowed --manifest "%CD%\windows.manifest" --hidden-import _cffi_backend --add-data "%CD%\THIRD_PARTY_NOTICES.txt;." --name GClock --distpath dist --workpath build\python --specpath build gclock.py
-start "" /wait "dist\GClock.exe" --smoke-test
+".venv\Scripts\python.exe" verify_executable.py
 ```
 
 specpath가build이므로데이터/매니페스트절대경로를사용한다. 라이선스는EXE안에묶고ZIP에도제공한다. run.cmd는프로젝트.venv우선,없으면python,오류시pause. 배포ZIP에는GClock.exe,README/ABOUT/SPEC,THIRD_PARTY_NOTICES만포함한다. 사용자settings.json/음악/토큰/가상환경은제외한다. EXE/ZIP SHA256파일을생성한다.
+
+자동 검사 보완: verify_executable.py가 이전 .build-temp/executable-smoke.json을 지운 뒤 EXE --smoke-test --smoke-report 절대경로를 실행한다. 60초 제한, 실제 종료 코드0, 새 JSON의 ok=true 및 version=VERSION이 모두 일치해야 성공이다. 시간 초과에는 자신이 실행한 프로세스 트리만 정리한다. smoke_main은 예외를 잡아 traceback을 JSON에 기록하고1로 종료해 PyInstaller 오류 팝업을 띄우지 않는다. run_smoke_test는 finally에서 창/타이머/오디오를 정리한다. 네이티브 설정창 매핑은 최대2초 이벤트 처리를 기다려 실제 Entry 표시를 검사한다.
 
 ## 9. 검증 및 GitHub
 
 TimerState의지연완료1회/일시정지/재개,다이얼크기동기화,슬라이더높이/프리셋/숫자간격,휠부분delta/경계/포커스,MP3완료/무음/실패,실제디코더및PCM gain과PlaybackDevice autospec,JSON손상/Unicode/원자성/작업폴더독립/재실행저장,언어전환중타이머/오디오유지,영어파일/오류/완료문구를검증한다. 배율96/144/192 DPI와300/600/1200px 렌더링검증도포함한다. Tk callback 예외는테스트실패다.
 
-EXE smoke는숨긴Tk에서생성/시작/언어전환/Pause문구/deadline유지/초기화/PhotoImage를검증한다. 메모리WAV의stream.send(2205)가4410 samples를반환하는지확인한다. 실제MP3 출력은별도검증이고클린PC/실제4K검증과모의배율검증을구분한다.
+EXE smoke는Tk에서생성/시작/언어전환/Pause문구/deadline유지/초기화/PhotoImage와 설정창 열기/닫기, 무음 완료 후 파동 3개와 다시 시작 시 animation after 해제를 검증한다. 메모리WAV의stream.send(2205)가4410 samples를반환하는지확인한다. 실제MP3 출력은별도검증이고클린PC/실제4K검증과모의배율검증을구분한다.
 
-이사용자는마무리시GitHub게시까지요청했다. 이프로젝트는공개nanjjo/GClock,기존origin을재사용한다. 최종소스/문서만선별커밋하고fast-forward push한다. v2.1 태그릴리스에EXE/ZIP/체크섬/출처/라이선스를올리고PUBLIC·게시상태·자산·원본EXE와업로드digest일치를확인한다. 기존태그/릴리스를강제덮어쓰지않는다. Git identity는확인된계정noreply또는기존프로젝트설정,credential helper는가능하면호출범위로둔다. 계정로그인은사용자가직접완료하고토큰을공개파일이나문서에넣지않는다.
+이사용자는마무리시GitHub게시까지요청했다. 이프로젝트는공개nanjjo/GClock,기존origin을재사용한다. 최종소스/문서만선별커밋하고fast-forward push한다. v2.2 태그릴리스에EXE/ZIP/체크섬/출처/라이선스를올리고PUBLIC·게시상태·자산·원본EXE와업로드digest일치를확인한다. 기존태그/릴리스를강제덮어쓰지않는다. Git identity는확인된계정noreply또는기존프로젝트설정,credential helper는가능하면호출범위로둔다. 계정로그인은사용자가직접완료하고토큰을공개파일이나문서에넣지않는다.
 
 ## 10. 처음부터 구현하는 순서와 한계
 

@@ -3,7 +3,9 @@ TEXT = {
     'ko': {
         'title': '시각 타이머', 'topmost': '항상 위', 'intro': '당신의 시간을 가볍게',
         'guide': '다이얼 클릭 후 휠 ↑↓: 1분 조절 · 드래그도 가능',
+        'completed_guide': '시계나 확인 버튼을 누르면 알림이 멈춥니다',
         'reset': '초기화', 'start': '시작', 'pause': '일시정지',
+        'audio_settings': '소리 설정', 'close': '닫기', 'acknowledge': '확인', 'restart': '다시 시작',
         'audio_title': '종료 시 재생할 MP3', 'mute': '무음', 'browse': '찾기',
         'preview': '미리 듣기', 'stop_audio': '재생 중지', 'preset': '{minutes}분',
         'choose_mp3': '종료 알림 MP3 선택', 'mp3_files': 'MP3 음악',
@@ -16,7 +18,9 @@ TEXT = {
     'en': {
         'title': 'Visual Timer', 'topmost': 'Always on top', 'intro': 'Make time for what matters',
         'guide': 'Click / drag dial · Wheel ↑↓: 1 min',
+        'completed_guide': 'Click the dial or Dismiss to stop the alert',
         'reset': 'Reset', 'start': 'Start', 'pause': 'Pause',
+        'audio_settings': 'Sound settings', 'close': 'Close', 'acknowledge': 'Dismiss', 'restart': 'Restart',
         'audio_title': 'MP3 at end', 'mute': 'Mute', 'browse': 'Browse',
         'preview': 'Preview', 'stop_audio': 'Stop audio', 'preset': '{minutes} min',
         'choose_mp3': 'Choose MP3 alarm', 'mp3_files': 'MP3 audio',

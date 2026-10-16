@@ -1,8 +1,21 @@
 import unittest
-from gclock import TimerState
+import json
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+from gclock import TimerState, smoke_main
 
 
 class TimerTests(unittest.TestCase):
+    def test_smoke_failure_returns_nonzero_and_preserves_diagnostic_report(self):
+        with tempfile.TemporaryDirectory(dir='.build-temp') as folder:
+            report = Path(folder) / 'smoke.json'
+            with patch('gclock.tk.Tk'), patch('gclock.run_smoke_test', side_effect=AssertionError('dialog mapping')):
+                self.assertEqual(smoke_main(report), 1)
+            result = json.loads(report.read_text(encoding='utf-8'))
+            self.assertFalse(result['ok'])
+            self.assertIn('AssertionError: dialog mapping', result['error'])
+
     def test_delayed_completion_once(self):
         now = [0.0]
         timer = TimerState(lambda: now[0])

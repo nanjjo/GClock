@@ -35,6 +35,12 @@ class DisplayTests(unittest.TestCase):
                     self.assertLessEqual(app.heading.winfo_rootx()+app.heading.winfo_width(),
                                          app.language_combo.winfo_rootx())
                     self.assertEqual(app.path_entry.winfo_height(), app.browse_button.winfo_height())
+                    app.show_audio_settings()
+                    root.update()
+                    self.assertTrue(app.path_entry.winfo_ismapped())
+                    self.assertEqual(app.path_entry.winfo_height(), app.browse_button.winfo_height())
+                    self.assertLessEqual(app.dialog_close_button.winfo_rooty()+app.dialog_close_button.winfo_height(),
+                                         app.audio_dialog.winfo_rooty()+app.audio_dialog.winfo_height())
                 finally:
                     app.close()
 

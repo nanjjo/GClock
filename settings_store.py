@@ -14,7 +14,7 @@ def validate(data):
         return result
     if data.get('language') in ('ko', 'en'):
         result['language'] = data['language']
-    if type(data.get('layout_version')) is int and data['layout_version'] in (1, 2, 3, 4):
+    if type(data.get('layout_version')) is int and data['layout_version'] in (1, 2, 3, 4, 5):
         result['layout_version'] = data['layout_version']
     seconds = data.get('selected_seconds')
     volume = data.get('volume_percent')
@@ -31,7 +31,7 @@ def validate(data):
         result['mp3_path'] = data['mp3_path']
     window = data.get('window')
     if isinstance(window, dict) and all(type(window.get(k)) is int for k in ('width', 'height', 'x', 'y')):
-        if 440 <= window['width'] <= 8000 and 650 <= window['height'] <= 8000 and all(abs(window[k]) <= 100000 for k in ('x', 'y')):
+        if 440 <= window['width'] <= 8000 and 500 <= window['height'] <= 8000 and all(abs(window[k]) <= 100000 for k in ('x', 'y')):
             result['window'] = dict(window)
     return result
 

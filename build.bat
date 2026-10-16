@@ -23,7 +23,7 @@ if errorlevel 1 goto failed
 if errorlevel 1 goto failed
 ".venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --onefile --windowed --manifest "%CD%\windows.manifest" --hidden-import _cffi_backend --add-data "%CD%\THIRD_PARTY_NOTICES.txt;." --name GClock --distpath dist --workpath build\python --specpath build gclock.py
 if errorlevel 1 goto failed
-start "" /wait "dist\GClock.exe" --smoke-test
+".venv\Scripts\python.exe" verify_executable.py
 if errorlevel 1 goto failed
 echo.
 echo Build succeeded: %CD%\dist\GClock.exe

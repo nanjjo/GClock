@@ -17,7 +17,7 @@ from pathlib import Path
 from volume_control import VolumeBar
 from translations import TEXT
 
-VERSION = '2.1'
+VERSION = '2.2'
 
 
 class TimerState:
@@ -65,6 +65,8 @@ class GClock:
         self.status_detail = ''
         self.save_id = None
         self.layout_id = None
+        self.completion_started = None
+        self.animation_id = None
         self.normal_window = saved.get('window')
         dpi = system_dpi()
         self.display_scale = dpi / 96
@@ -85,8 +87,8 @@ class GClock:
         self.last_drawing = None
         self.last_layout = None
         root.title(f'GClock · 시각 타이머 · v{VERSION}')
-        root.geometry(f'{round(512*self.display_scale)}x{round(704*self.display_scale)}')
-        root.minsize(round(440*self.display_scale), round(650*self.display_scale))
+        root.geometry(f'{round(512*self.display_scale)}x{round(560*self.display_scale)}')
+        root.minsize(round(440*self.display_scale), round(500*self.display_scale))
         if self.normal_window:
             window = self.normal_window
             if saved.get('layout_version', 1) < 2:
@@ -99,6 +101,8 @@ class GClock:
                 window = dict(window, width=max(440, window['width']-48),
                               height=max(650, window['height']-16))
             width = round(window['width']*self.display_scale)
+            if saved.get('layout_version', 1) < 5:
+                window = dict(window, height=max(500, window['height']-144))
             height = round(window['height']*self.display_scale)
             x, y = window['x'], window['y']
             # Restore only if part of the caption can still be reached.
@@ -106,7 +110,7 @@ class GClock:
             vx, vy = user32.GetSystemMetrics(76), user32.GetSystemMetrics(77)
             vw, vh = user32.GetSystemMetrics(78), user32.GetSystemMetrics(79)
             if x+width > vx+80 and x < vx+vw-80 and vy <= y < vy+vh-40:
-                root.geometry(f'{width}x{height}+{x}+{y}')
+                root.geometry(f'{width}x{height}{x:+d}{y:+d}')
         root.attributes('-topmost', self.topmost.get())
         root.protocol('WM_DELETE_WINDOW', self.close)
         root.configure(bg='#f5f3ed')
@@ -133,7 +137,7 @@ class GClock:
         self.language_combo.pack(side='left', padx=(0, 4))
         self.language_combo.bind('<<ComboboxSelected>>', self.change_language)
         self.topmost_button = ttk.Checkbutton(options, variable=self.topmost,
-                        command=lambda: root.attributes('-topmost', self.topmost.get()))
+                        command=self.topmost_changed)
         self.topmost_button.pack(side='left', padx=6)
         for index, color in enumerate(self.COLORS):
             tk.Button(options, bg=color, activebackground=color, width=2,
@@ -171,7 +175,20 @@ class GClock:
         self.reset_button.pack(side='left', padx=6)
         self.play = ttk.Button(controls, text='시작', command=self.toggle)
         self.play.pack(side='left', padx=6)
-        audio_heading = ttk.Frame(main)
+        self.settings_button = ttk.Button(controls, command=self.show_audio_settings)
+        self.settings_button.pack(side='left', padx=6)
+        # Keep one non-modal dialog so variables/traces are never duplicated.
+        self.audio_dialog = tk.Toplevel(root)
+        self.audio_dialog.withdraw()
+        self.audio_dialog.transient(root)
+        self.audio_dialog.configure(bg='#f5f3ed')
+        self.audio_dialog.geometry(f'{round(640*self.display_scale)}x{round(200*self.display_scale)}')
+        self.audio_dialog.minsize(round(540*self.display_scale), round(200*self.display_scale))
+        self.audio_dialog.protocol('WM_DELETE_WINDOW', self.hide_audio_settings)
+        self.audio_dialog.bind('<Escape>', lambda _: self.hide_audio_settings())
+        audio_panel = ttk.Frame(self.audio_dialog, padding=round(12*self.display_scale))
+        audio_panel.pack(fill='both', expand=True)
+        audio_heading = ttk.Frame(audio_panel)
         audio_heading.pack(fill='x', pady=(12, 4))
         self.audio_title = ttk.Label(audio_heading, text='종료 시 재생할 MP3')
         self.audio_title.pack(side='left', anchor='center')
@@ -181,7 +198,7 @@ class GClock:
                                         scale=self.display_scale)
         self.volume_slider.pack(side='right', anchor='center', padx=(round(10*self.display_scale), 0))
         self.mute_button.pack(side='right', anchor='center', padx=(8, 0))
-        audio_row = ttk.Frame(main)
+        audio_row = ttk.Frame(audio_panel)
         audio_row.pack(fill='x')
         self.path_entry = ttk.Entry(audio_row, textvariable=self.mp3_path)
         original_font = tkfont.Font(root=root, font=self.path_entry.cget('font'))
@@ -189,12 +206,14 @@ class GClock:
         self.path_entry.pack(side='left', fill='both', expand=True)
         self.browse_button = ttk.Button(audio_row, text='찾기', width=4, command=self.browse_mp3)
         self.browse_button.pack(side='left', padx=(6, 0))
-        audio_controls = ttk.Frame(main)
+        audio_controls = ttk.Frame(audio_panel)
         audio_controls.pack(pady=(6, 0))
         self.preview_button = ttk.Button(audio_controls, command=self.preview_audio)
         self.preview_button.pack(side='left', padx=4)
         self.stop_button = ttk.Button(audio_controls, command=self.stop_audio)
         self.stop_button.pack(side='left', padx=4)
+        self.dialog_close_button = ttk.Button(audio_controls, command=self.hide_audio_settings)
+        self.dialog_close_button.pack(side='left', padx=4)
         root.bind('<space>', lambda e: self.shortcut(e, self.toggle))
         root.bind('<Escape>', lambda e: self.shortcut(e, self.reset))
         self.apply_language()
@@ -225,9 +244,11 @@ class GClock:
         self.root.title(f'GClock · {self.tr("title")} · v{VERSION}')
         for widget, key in ((self.topmost_button, 'topmost'), (self.guide, 'guide'),
                             (self.reset_button, 'reset'), (self.audio_title, 'audio_title'),
+                            (self.settings_button, 'audio_settings'), (self.dialog_close_button, 'close'),
                             (self.mute_button, 'mute'), (self.browse_button, 'browse'),
                             (self.preview_button, 'preview'), (self.stop_button, 'stop_audio')):
             widget.config(text=self.tr(key))
+        self.audio_dialog.title(self.tr('audio_settings'))
         self.browse_button.config(width=6 if self.language == 'en' else 4)
         for minutes, button in self.preset_buttons:
             button.config(text=self.tr('preset', minutes=minutes), width=6 if self.language == 'en' else 4)
@@ -288,13 +309,13 @@ class GClock:
         self.save_id = None
         if self.root.state() == 'normal' and self.root.winfo_width() > 1:
             self.normal_window = dict(width=max(440, round(self.root.winfo_width()/self.display_scale)),
-                                      height=max(650, round(self.root.winfo_height()/self.display_scale)),
+                                      height=max(500, round(self.root.winfo_height()/self.display_scale)),
                                       x=self.root.winfo_x(), y=self.root.winfo_y())
         data = dict(selected_seconds=self.state.selected, color=self.color,
                     muted=self.muted.get(), topmost=self.topmost.get(),
                     mp3_path=self.mp3_path.get(), window=self.normal_window,
                     volume_percent=self.volume.get(),
-                    layout_version=4,
+                    layout_version=5,
                     language=self.language,
                     maximized=self.root.state() == 'zoomed')
         try:
@@ -310,10 +331,35 @@ class GClock:
     def browse_mp3(self):
         self.path_entry.focus_set()
         self.wheel_remainder = 0
-        path = filedialog.askopenfilename(parent=self.root, title=self.tr('choose_mp3'),
+        path = filedialog.askopenfilename(parent=self.audio_dialog, title=self.tr('choose_mp3'),
                                          filetypes=[(self.tr('mp3_files'), '*.mp3')])
         if path:
             self.mp3_path.set(path)
+
+    def show_audio_settings(self):
+        was_hidden = self.audio_dialog.state() == 'withdrawn'
+        self.audio_dialog.deiconify()
+        if was_hidden:
+            self.audio_dialog.update_idletasks()
+            w, h = self.audio_dialog.winfo_width(), self.audio_dialog.winfo_height()
+            user32 = ctypes.windll.user32
+            vx, vy = user32.GetSystemMetrics(76), user32.GetSystemMetrics(77)
+            vw, vh = user32.GetSystemMetrics(78), user32.GetSystemMetrics(79)
+            x = max(vx, min(self.root.winfo_x()+(self.root.winfo_width()-w)//2, vx+vw-w))
+            y = max(vy, min(self.root.winfo_y()+(self.root.winfo_height()-h)//2, vy+vh-h))
+            self.audio_dialog.geometry(f'{x:+d}{y:+d}')
+        self.audio_dialog.lift()
+        self.audio_dialog.attributes('-topmost', self.topmost.get())
+        self.path_entry.focus_set()
+
+    def topmost_changed(self):
+        self.root.attributes('-topmost', self.topmost.get())
+        self.audio_dialog.attributes('-topmost', self.topmost.get())
+
+    def hide_audio_settings(self):
+        self.stop_audio()
+        self.audio_dialog.withdraw()
+        self.canvas.focus_set()
 
     def audio_path(self):
         path = Path(self.mp3_path.get().strip().strip('"')).expanduser()
@@ -325,7 +371,7 @@ class GClock:
         try:
             self.audio.play(self.audio_path())
         except (ValueError, RuntimeError, OSError) as error:
-            messagebox.showerror(self.tr('play_error'), self.error_text(error), parent=self.root)
+            messagebox.showerror(self.tr('play_error'), self.error_text(error), parent=self.audio_dialog)
 
     def stop_audio(self):
         try:
@@ -338,6 +384,7 @@ class GClock:
             self.stop_audio()
 
     def close(self):
+        self.stop_completion()
         self.root.after_cancel(self.tick_id)
         if self.layout_id is not None:
             self.root.after_cancel(self.layout_id)
@@ -355,6 +402,9 @@ class GClock:
             self.select(float(value), sync=False)
 
     def select(self, minutes, sync=True):
+        if self.completion_started is not None:
+            self.stop_audio()
+            self.stop_completion()
         self.state.set_minutes(minutes)
         if sync:
             self.slider.set(round(minutes))
@@ -370,6 +420,9 @@ class GClock:
             return
         self.canvas.focus_set()
         self.wheel_remainder = 0
+        if self.completion_started is not None:
+            self.reset()
+            return
         if math.hypot(dx, dy) < radius * .13:
             return
         angle = math.atan2(-dx, -dy) % math.tau
@@ -386,6 +439,10 @@ class GClock:
         return 'break'
 
     def toggle(self):
+        if self.completion_started is not None:
+            self.stop_audio()
+            self.stop_completion()
+            self.state.reset()
         if self.state.deadline is None:
             self.state.start()
         else:
@@ -395,6 +452,7 @@ class GClock:
 
     def reset(self):
         self.stop_audio()
+        self.stop_completion()
         self.state.reset()
         self.set_status('reset_ready')
         self.refresh()
@@ -403,6 +461,7 @@ class GClock:
         self.root.after_cancel(self.tick_id)
         if self.state.tick():
             self.set_status('completed')
+            self.start_completion()
             if not self.muted.get():
                 if self.mp3_path.get().strip():
                     try:
@@ -418,9 +477,49 @@ class GClock:
     def refresh(self):
         seconds = math.ceil(self.state.remaining)
         self.time_label.config(text=f'{seconds // 60:02}:{seconds % 60:02}')
-        self.play.config(text=self.tr('pause' if self.state.deadline else 'start'),
-                         state='normal' if seconds else 'disabled')
+        completed = self.completion_started is not None
+        self.guide.config(text=self.tr('completed_guide' if completed else 'guide'))
+        self.reset_button.config(text=self.tr('acknowledge' if completed else 'reset'))
+        self.play.config(text=self.tr('restart' if completed else 'pause' if self.state.deadline else 'start'),
+                         state='normal' if seconds or completed else 'disabled')
         self.draw()
+
+    def start_completion(self):
+        self.stop_completion()
+        self.completion_started = time.monotonic()
+        self.animate_completion()
+
+    def stop_completion(self):
+        if self.animation_id is not None:
+            self.root.after_cancel(self.animation_id)
+            self.animation_id = None
+        self.completion_started = None
+        self.canvas.delete('completion')
+
+    def draw_completion(self):
+        if self.completion_started is None:
+            return
+        x, y, radius = self.geometry()
+        elapsed = time.monotonic() - self.completion_started
+        rgb = tuple(int(self.color[i:i+2], 16) for i in (1, 3, 5))
+        # Only lightweight Canvas rings animate; the high-DPI dial stays cached.
+        for index in range(3):
+            phase = (elapsed / 2.4 + index / 3) % 1
+            r = radius * (.12 + .86 * phase)
+            alpha = .85 * (1-phase)
+            color = '#' + ''.join(f'{round(238+(channel-238)*alpha):02x}' for channel in rgb)
+            tag = f'wave{index}'
+            if not self.canvas.find_withtag(tag):
+                self.canvas.create_oval(0, 0, 0, 0, tags=('completion', tag))
+            self.canvas.coords(tag, x-r, y-r, x+r, y+r)
+            self.canvas.itemconfigure(tag, outline=color, width=max(2, round(radius*.018)))
+        self.canvas.tag_raise('completion')
+
+    def animate_completion(self):
+        self.animation_id = None
+        if self.completion_started is not None:
+            self.draw_completion()
+            self.animation_id = self.root.after(33, self.animate_completion)
 
     def geometry(self):
         w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
@@ -453,13 +552,15 @@ class GClock:
         rendered = self.renderer.render(round(2*radius), self.color, self.state.remaining)
         self.dial_image = ImageTk.PhotoImage(rendered, master=self.root)
         canvas.create_image(x, y, image=self.dial_image)
+        self.draw_completion()
 
 
-if __name__ == '__main__':
-    enable_dpi_awareness()
-    root = tk.Tk()
-    if '--smoke-test' in sys.argv:
-        root.withdraw()
+def run_smoke_test(root):
+    """Exercise the packaged app; always release timers, audio and windows."""
+    app = None
+    callback_errors = []
+    root.report_callback_exception = lambda *error: callback_errors.append(str(error[1]))
+    try:
         app = GClock(root, settings_path=False)
         root.update()
         app.select(60)
@@ -477,6 +578,26 @@ if __name__ == '__main__':
         app.change_language()
         app.reset()
         assert app.state.remaining == 3600
+        assert app.audio_dialog.state() == 'withdrawn'
+        # Native window mapping can finish after update() on a busy desktop.
+        root.deiconify()
+        app.show_audio_settings()
+        mapping_deadline = time.monotonic() + 2
+        while not app.path_entry.winfo_ismapped() and time.monotonic() < mapping_deadline:
+            root.update()
+            time.sleep(.01)
+        if not app.path_entry.winfo_ismapped():
+            raise RuntimeError('Sound settings did not become visible within 2 seconds')
+        app.hide_audio_settings()
+        root.withdraw()
+        app.muted.set(True)
+        app.state.deadline = app.state.clock()-1
+        app.tick()
+        assert len(app.canvas.find_withtag('completion')) == 3
+        assert app.animation_id is not None
+        app.toggle()
+        assert app.animation_id is None and app.state.deadline is not None
+        app.reset()
         # Verify bundled native decoder and the 50 ms device request size.
         import io
         import wave
@@ -490,7 +611,40 @@ if __name__ == '__main__':
         stream = miniaudio.stream_memory(wav_data.getvalue(), frames_to_read=32768)
         assert len(stream.send(2205)) == 4410
         stream.close()
-        app.close()
+        if callback_errors:
+            raise RuntimeError('; '.join(callback_errors))
+    finally:
+        if app is not None:
+            app.close()
+        else:
+            root.destroy()
+
+
+def smoke_main(report_path):
+    """Return a failing exit code plus a report instead of a windowed traceback."""
+    import json
+    import traceback
+    report = {'ok': False, 'version': VERSION}
+    try:
+        run_smoke_test(tk.Tk())
+        report['ok'] = True
+    except Exception:
+        report['error'] = traceback.format_exc()
+    try:
+        Path(report_path).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+    except OSError:
+        return 1
+    return 0 if report['ok'] else 1
+
+
+if __name__ == '__main__':
+    enable_dpi_awareness()
+    if '--smoke-test' in sys.argv:
+        report_path = Path(sys.executable if getattr(sys, 'frozen', False) else __file__).with_name('GClock-smoke-test.json')
+        if '--smoke-report' in sys.argv:
+            report_path = sys.argv[sys.argv.index('--smoke-report')+1]
+        sys.exit(smoke_main(report_path))
     else:
+        root = tk.Tk()
         GClock(root)
         root.mainloop()
