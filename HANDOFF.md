@@ -50,7 +50,7 @@ Python 없는 별도 PC/VM, 실제 사용자4K 모니터와 혼합 DPI 이동 �
 
 대상은 사용자 승인된 공개 저장소 https://github.com/nanjjo/GClock 이다. 기존 v2.0/v2.1은 유지한다.
 
-v2.2 게시 상태: 업로드 확인 중.
+v2.2 게시 상태: 2026-10-17(Asia/Seoul) 공개 main 소스 및 정식 최신 릴리스 게시 완료. 자산5개의 uploaded 상태와 서버 SHA256/로컬 파일 일치를 확인했다. 소스 릴리스 커밋은 bf29009이며, 이후 HANDOFF 게시 결과만 추가 갱신한다.
 
 릴리스: https://github.com/nanjjo/GClock/releases/tag/v2.2
 
