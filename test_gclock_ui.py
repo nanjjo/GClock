@@ -220,21 +220,48 @@ class InteractionTests(unittest.TestCase):
         self.app.state.deadline = self.app.state.clock() - 1
         self.app.tick()
         self.app.audio.play.assert_called_once_with(str(Path('C:/music/alarm.mp3')))
+        self.app.audio.play_chime.assert_not_called()
         self.app.audio.reset_mock()
         self.app.muted.set(True)
         self.app.state.deadline = self.app.state.clock() - 1
         self.app.tick()
         self.app.audio.play.assert_not_called()
+        self.app.audio.play_chime.assert_not_called()
 
     def test_mp3_failure_falls_back_to_alert(self):
         self.app.audio = Mock()
         self.app.audio.play.side_effect = ValueError('missing file')
         self.app.mp3_path.set('missing.mp3')
         self.app.state.deadline = self.app.state.clock() - 1
-        with patch('gclock.winsound.PlaySound') as alert:
-            self.app.tick()
-            alert.assert_called_once()
+        self.app.tick()
+        self.app.audio.play_chime.assert_called_once()
         self.assertIn('MP3 재생 실패', self.app.status.cget('text'))
+
+    def test_empty_mp3_plays_chime_once_and_mute_suppresses_it(self):
+        self.app.audio = Mock()
+        self.app.mp3_path.set('  ')
+        self.app.state.deadline = self.app.state.clock()-1
+        self.app.tick()
+        self.app.tick()
+        self.app.audio.play_chime.assert_called_once()
+        self.app.audio.play.assert_not_called()
+        self.assertIsNotNone(self.app.completion_started)
+        self.app.reset()
+        self.app.audio.reset_mock()
+        self.app.muted.set(True)
+        self.app.state.deadline = self.app.state.clock()-1
+        self.app.tick()
+        self.app.audio.play_chime.assert_not_called()
+        self.assertIsNotNone(self.app.completion_started)
+
+    def test_chime_device_error_keeps_visual_alarm_and_tick_running(self):
+        self.app.audio = Mock()
+        self.app.audio.play_chime.side_effect = RuntimeError('Device unavailable')
+        self.app.state.deadline = self.app.state.clock()-1
+        self.app.tick()
+        self.assertIsNotNone(self.app.completion_started)
+        self.assertIn('Device unavailable', self.app.status.cget('text'))
+        self.assertIsNotNone(self.app.tick_id)
 
     def test_wheel_focus_limits_and_partial_deltas(self):
         self.app.canvas.focus_force()

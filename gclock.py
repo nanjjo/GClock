@@ -5,7 +5,6 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog, messagebox
 from audio_player import AudioPlayer
-import winsound
 import sys
 from PIL import ImageTk
 from dial_renderer import DialRenderer
@@ -17,7 +16,7 @@ from pathlib import Path
 from volume_control import VolumeBar
 from translations import TEXT
 
-VERSION = '2.2'
+VERSION = '2.3'
 
 
 class TimerState:
@@ -468,11 +467,17 @@ class GClock:
                         self.audio.play(self.audio_path())
                     except (ValueError, RuntimeError, OSError) as error:
                         self.set_status('play_error', error)
-                        winsound.PlaySound('SystemExclamation', winsound.SND_ALIAS | winsound.SND_ASYNC)
+                        self.play_default_alarm()
                 else:
-                    winsound.PlaySound('SystemExclamation', winsound.SND_ALIAS | winsound.SND_ASYNC)
+                    self.play_default_alarm()
         self.refresh()
         self.tick_id = self.root.after(100, self.tick)
+
+    def play_default_alarm(self):
+        try:
+            self.audio.play_chime()
+        except (ValueError, RuntimeError, OSError) as error:
+            self.set_status('play_error', error)
 
     def refresh(self):
         seconds = math.ceil(self.state.remaining)
@@ -610,6 +615,10 @@ def run_smoke_test(root):
             wav.writeframes(b'\0' * 44100 * 4)
         stream = miniaudio.stream_memory(wav_data.getvalue(), frames_to_read=32768)
         assert len(stream.send(2205)) == 4410
+        stream.close()
+        from audio_player import chime_wav
+        stream = miniaudio.stream_memory(chime_wav(), frames_to_read=32768)
+        assert any(stream.send(2205))
         stream.close()
         if callback_errors:
             raise RuntimeError('; '.join(callback_errors))

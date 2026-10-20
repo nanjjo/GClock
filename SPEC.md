@@ -1,6 +1,6 @@
-# GClock v2.2 — 빈 프로젝트에서 만드는 독립 제작 사양
+# GClock v2.3 — 빈 프로젝트에서 만드는 독립 제작 사양
 
-작성일: 2026-10-17 (Asia/Seoul). 현재 소스와 대화 없이 이 문서로 동등한 Windows 시각 타이머를 만들 수 있어야 한다. 앱은 Python/Tkinter 데스크톱 프로그램이다. HTTP API·Android 앱을 대신 만들지 않는다. 제작 도구 표기는GPT-6.1 Sol이다.
+작성일: 2026-10-20 (Asia/Seoul). 현재 소스와 대화 없이 이 문서로 동등한 Windows 시각 타이머를 만들 수 있어야 한다. 앱은 Python/Tkinter 데스크톱 프로그램이다. HTTP API·Android 앱을 대신 만들지 않는다. 제작 도구 표기는GPT-6.1 Sol이다.
 
 ## 1. 환경과 파일
 
@@ -31,9 +31,9 @@ TimerState(clock=time.monotonic)를 만든다. selected=1500 정수초, remainin
 
 ## 3. DPI와 기본 화면
 
-Tk 생성 전에SetProcessDPIAware를 호출하고 지원되지 않으면 무시한다. EXE manifest는dpiAware=true, dpiAwareness=System, requestedExecutionLevel=asInvoker, assemblyIdentity.version=2.2.0.0으로 설정한다. GetDpiForSystem이 없으면96을 사용한다. s=dpi/96, Tk scaling=dpi/72. 글꼴은 point 단위로 지정하고 다시s를 곱하지 않는다.
+Tk 생성 전에SetProcessDPIAware를 호출하고 지원되지 않으면 무시한다. EXE manifest는dpiAware=true, dpiAwareness=System, requestedExecutionLevel=asInvoker, assemblyIdentity.version=2.3.0.0으로 설정한다. GetDpiForSystem이 없으면96을 사용한다. s=dpi/96, Tk scaling=dpi/72. 글꼴은 point 단위로 지정하고 다시s를 곱하지 않는다.
 
-VERSION='2.2'. 창 제목은 GClock · 시각 타이머 · v2.2 또는 영어 GClock · Visual Timer · v2.2이다. 기본512*s ×560*s, 최소440*s ×500*s. 배경#f5f3ed, ttk clam. 기본 맑은 고딕11pt, 버튼padding=round(8*s). main의패딩(left6*s,top0,right6*s,bottom4*s).
+VERSION='2.3'. 창 제목은 GClock · 시각 타이머 · v2.3 또는 영어 GClock · Visual Timer · v2.3이다. 기본512*s ×560*s, 최소440*s ×500*s. 배경#f5f3ed, ttk clam. 기본 맑은 고딕11pt, 버튼padding=round(8*s). main의패딩(left6*s,top0,right6*s,bottom4*s).
 
 상단 헤더 왼쪽GClock23pt bold. 오른쪽그룹은 한국어/English 읽기 전용콤보(width7,11pt), 항상 위 체크박스, 색상3개 순서다. 색상은#df4a42,#3d8769,#447db0. 마지막색상 버튼 오른쪽pack padx=0으로 끝선을 맞춘다. 항상 위는root.attributes('-topmost',bool).
 
@@ -83,7 +83,13 @@ device.start(stream)
 
 기본signed16,2채널,44100Hz. miniaudio1.71에는장치set_master_volume이없다. volume_stream은try/finally안에서frames=yield b'' 후source.send(frames)로받은배열을,volume==1이면그대로그외에는array('h',(round(sample*volume) for sample in samples))로yield한다. 매청크의최신volume을읽는다. source StopIteration에는반환하고finally source.close한다. stop은device.close 후wrapper.close,참조None순서다. 디코더/장치오류는정리후RuntimeError로UI에전달한다. 이전500ms period/16384디코더용량은22050프레임요청을못받아CFFI오류가났으므로디코더용량32768을유지한다. 50ms period2개는약100ms 출력큐목표일뿐물리청취지연보장은아니다.
 
-미리듣기는무음과무관한수동재생. 무음체크는현재재생stop 및자동알림억제. 타이머완료시MP3가설정되면재생,없거나재생실패시winsound SystemExclamation/SND_ALIAS|SND_ASYNC. 미리듣기오류는messagebox,자동재생오류는상태에표시한뒤기본음. 상대음악경로는JSON부모기준이며두경로모두공통audio_path를사용한다.
+미리듣기는무음과무관한수동재생. 무음체크는현재재생stop 및자동알림억제. 타이머완료시MP3가설정되면재생,없거나재생실패시AudioPlayer.play_chime()으로 내장 솔–미 알림을 한 번 재생한다. 무음이면 두 소리 모두 재생하지 않는다. 기본 알림의 장치 오류는 상태에 표시하고 파동/타이머 콜백은 유지한다. 미리듣기오류는messagebox,자동재생오류는상태에표시한뒤기본음. 상대음악경로는JSON부모기준이며두경로모두공통audio_path를사용한다.
+
+### 내장 솔–미 알림
+
+audio_player.chime_wav()를 lru_cache(maxsize=1)로 캐시한다. rate44100, stereo signed16 WAV를 io.BytesIO/wave로 생성한다. 외부 음원/코덱 파일은 없다. 첫 음 G5=783.990872Hz, 길이.42초, 둘째 E5=659.255114Hz, 길이.65초이며 각 음 뒤.04초 무음을 넣는다. frame수=round(rate*duration), t=frame/rate, angle=tau*frequency*t. envelope=min(1,t/.008)*min(1,(count-1-frame)/(rate*.015))*exp(-5*t/duration), tone=.78*sin(angle)+.16*sin(2*angle)+.06*sin(3*angle), sample=round(24000*envelope*tone)이다. 동일 sample을 좌우 채널에 쓴다. 시작/종료를0으로 만들어 클릭음을 줄인다.
+
+play(path)는 MP3 경로 검증 후 bytes를 play_data로 넘기고, play_chime은 WAV bytes를 같은 play_data로 넘긴다. play_data는 기존 음악 정지 후 동일 stream_memory/volume_stream/PlaybackDevice로 비동기 재생한다. 따라서 기본 알림도 앱 볼륨·정지·무음을 따른다. 내장 WAV를 실제 miniaudio로 디코드하고 G5/E5 순서 및 다음 청크 볼륨0, MP3 없는 종료1회/무음/장치 오류 때 시각 알림 유지를 검증한다.
 
 ## 6A. 지속되는 종료 파동
 
@@ -114,11 +120,11 @@ SettingsStore(path=None/False/지정경로). frozen은Path(sys.executable).resol
 
 창크기는s로나눈논리값,좌표는물리값. 가상모니터GetSystemMetrics(76..79)와비교해접근가능한제목위치일때복원한다. 최대화는normal창크기를유지한채복원한다. JSON변경은500ms debounce와종료시저장. 진행중remaining/deadline/재생상태는저장하지않는다.
 
-구형window마이그레이션:layout<2는최소520×720,layout<3는폭+40(최대8000),layout<4는width=max(440,width-48),height=max(650,height-16). 이어서 layout<5는 height=max(500,height-144). 순서대로적용하고다음저장에layout_version5. 제품버전2.2와분리한다. 종료는파동 animation after 취소 및 Canvas 파동 삭제→tick/save/layout after 취소→설정저장→오디오stop→root.destroy.
+구형window마이그레이션:layout<2는최소520×720,layout<3는폭+40(최대8000),layout<4는width=max(440,width-48),height=max(650,height-16). 이어서 layout<5는 height=max(500,height-144). 순서대로적용하고다음저장에layout_version5. 제품버전2.3과분리한다. 종료는파동 animation after 취소 및 Canvas 파동 삭제→tick/save/layout after 취소→설정저장→오디오stop→root.destroy.
 
 ## 8. 빌드와 배포
 
-build.bat는setlocal,cd /d "%~dp0",.build-temp 생성후TEMP/TMP/PYINSTALLER_CONFIG_DIR를프로젝트내부로설정한다. .venv가없으면py -3 또는python -m venv로만든다. ensurepip,고정requirements-build 설치,테스트25개실행,PyInstaller순서이며매단계errorlevel검사와실패exit /b1.
+build.bat는setlocal,cd /d "%~dp0",.build-temp 생성후TEMP/TMP/PYINSTALLER_CONFIG_DIR를프로젝트내부로설정한다. .venv가없으면py -3 또는python -m venv로만든다. ensurepip,고정requirements-build 설치,테스트28개실행,PyInstaller순서이며매단계errorlevel검사와실패exit /b1.
 
 ```bat
 ".venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --onefile --windowed --manifest "%CD%\windows.manifest" --hidden-import _cffi_backend --add-data "%CD%\THIRD_PARTY_NOTICES.txt;." --name GClock --distpath dist --workpath build\python --specpath build gclock.py
@@ -135,7 +141,7 @@ TimerState의지연완료1회/일시정지/재개,다이얼크기동기화,슬�
 
 EXE smoke는Tk에서생성/시작/언어전환/Pause문구/deadline유지/초기화/PhotoImage와 설정창 열기/닫기, 무음 완료 후 파동 3개와 다시 시작 시 animation after 해제를 검증한다. 메모리WAV의stream.send(2205)가4410 samples를반환하는지확인한다. 실제MP3 출력은별도검증이고클린PC/실제4K검증과모의배율검증을구분한다.
 
-이사용자는마무리시GitHub게시까지요청했다. 이프로젝트는공개nanjjo/GClock,기존origin을재사용한다. 최종소스/문서만선별커밋하고fast-forward push한다. v2.2 태그릴리스에EXE/ZIP/체크섬/출처/라이선스를올리고PUBLIC·게시상태·자산·원본EXE와업로드digest일치를확인한다. 기존태그/릴리스를강제덮어쓰지않는다. Git identity는확인된계정noreply또는기존프로젝트설정,credential helper는가능하면호출범위로둔다. 계정로그인은사용자가직접완료하고토큰을공개파일이나문서에넣지않는다.
+이사용자는마무리시GitHub게시까지요청했다. 이프로젝트는공개nanjjo/GClock,기존origin을재사용한다. 최종소스/문서만선별커밋하고fast-forward push한다. v2.3 태그릴리스에EXE/ZIP/체크섬/출처/라이선스를올리고PUBLIC·게시상태·자산·원본EXE와업로드digest일치를확인한다. 기존태그/릴리스를강제덮어쓰지않는다. Git identity는확인된계정noreply또는기존프로젝트설정,credential helper는가능하면호출범위로둔다. 계정로그인은사용자가직접완료하고토큰을공개파일이나문서에넣지않는다.
 
 ## 10. 처음부터 구현하는 순서와 한계
 

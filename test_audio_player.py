@@ -6,10 +6,28 @@ from unittest.mock import patch
 import tempfile
 from pathlib import Path
 import miniaudio
-from audio_player import AudioPlayer
+from audio_player import AudioPlayer, chime_wav
 
 
 class AudioTests(unittest.TestCase):
+    def test_chime_has_sol_then_mi_and_uses_live_volume(self):
+        with wave.open(io.BytesIO(chime_wav()), 'rb') as wav:
+            self.assertEqual((wav.getnchannels(), wav.getsampwidth(), wav.getframerate()), (2, 2, 44100))
+            pcm = array('h', wav.readframes(wav.getnframes()))[::2]
+        for offset, frequency in ((.04, 783.990872), (.50, 659.255114)):
+            part = pcm[round(offset*44100):round((offset+.1)*44100)]
+            crossings = sum(a <= 0 < b for a, b in zip(part, part[1:]))
+            self.assertAlmostEqual(crossings, frequency*.1, delta=2)
+        self.assertEqual(pcm[0], 0)
+        self.assertEqual(pcm[-1], 0)
+        with patch('audio_player.miniaudio.PlaybackDevice', autospec=True):
+            player = AudioPlayer()
+            player.play_chime()
+            self.assertTrue(any(player.stream.send(2205)))
+            player.set_volume(0)
+            self.assertTrue(all(sample == 0 for sample in player.stream.send(2205)))
+            player.stop()
+
     def test_preview_with_real_decoder_and_supported_device_api(self):
         data = io.BytesIO()
         with wave.open(data, 'wb') as wav:
